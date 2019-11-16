@@ -11,6 +11,14 @@ import {
   getFirstDefined,
   ensurePluginOrder,
 } from '../utils'
+import {
+  HooksList,
+  Column,
+  TableInstance,
+  ColumnHook,
+  TableHook,
+  Row,
+} from '../globalTypes'
 
 defaultState.groupBy = []
 
@@ -37,10 +45,10 @@ const propTypes = {
   aggregations: PropTypes.object,
 }
 
-export const useGroupBy = hooks => {
+export const useGroupBy = (hooks: HooksList) => {
   hooks.columnsBeforeHeaderGroups.push(columnsBeforeHeaderGroups)
   hooks.columnsBeforeHeaderGroupsDeps.push((deps, instance) => {
-    deps.push(instance.state.groupBy)
+    deps.push(instance.state.groupBy as any)
     return deps
   })
   hooks.useMain.push(useMain)
@@ -48,12 +56,15 @@ export const useGroupBy = hooks => {
 
 useGroupBy.pluginName = 'useGroupBy'
 
-function columnsBeforeHeaderGroups(flatColumns, { state: { groupBy } }) {
+const columnsBeforeHeaderGroups: ColumnHook = (flatColumns, instance) => {
+  const groupBy = instance.state.groupBy
   // Sort grouped columns to the start of the column list
   // before the headers are built
 
   const groupByColumns = groupBy.map(g => flatColumns.find(col => col.id === g))
-  const nonGroupByColumns = flatColumns.filter(col => !groupBy.includes(col.id))
+  const nonGroupByColumns = flatColumns.filter(
+    col => !groupBy.includes(col.id!)
+  )
 
   // If a groupByBoundary column is found, place the groupBy's after it
   const groupByBoundaryColumnIndex =
@@ -61,12 +72,12 @@ function columnsBeforeHeaderGroups(flatColumns, { state: { groupBy } }) {
 
   return [
     ...nonGroupByColumns.slice(0, groupByBoundaryColumnIndex),
-    ...groupByColumns,
+    ...(groupByColumns as Column[]),
     ...nonGroupByColumns.slice(groupByBoundaryColumnIndex),
   ]
 }
 
-function useMain(instance) {
+const useMain: TableHook = instance => {
   PropTypes.checkPropTypes(propTypes, instance, 'property', 'useGroupBy')
 
   const {
@@ -88,8 +99,8 @@ function useMain(instance) {
 
   flatColumns.forEach(column => {
     const { id, accessor, disableGrouping: columnDisableGrouping } = column
-    column.isGrouped = groupBy.includes(id)
-    column.groupedIndex = groupBy.indexOf(id)
+    column.isGrouped = groupBy.includes(id!)
+    column.groupedIndex = groupBy.indexOf(id!)
 
     column.canGroupBy = accessor
       ? getFirstDefined(
@@ -100,13 +111,13 @@ function useMain(instance) {
       : false
 
     if (column.canGroupBy) {
-      column.toggleGroupBy = () => toggleGroupBy(column.id)
+      column.toggleGroupBy = () => toggleGroupBy(column.id!)
     }
 
     column.Aggregated = column.Aggregated || column.Cell
   })
 
-  const toggleGroupBy = (id, toggle) => {
+  const toggleGroupBy = (id: string, toggle?: boolean) => {
     return setState(old => {
       const resolvedToggle =
         typeof toggle !== 'undefined' ? toggle : !groupBy.includes(id)
@@ -131,7 +142,7 @@ function useMain(instance) {
       return mergeProps(
         {
           onClick: canGroupBy
-            ? e => {
+            ? (e: any) => {
                 e.persist()
                 header.toggleGroupBy()
               }
@@ -150,9 +161,10 @@ function useMain(instance) {
   hooks.prepareRow.push(row => {
     row.cells.forEach(cell => {
       // Grouped cells are in the groupBy and the pivot cell for the row
-      cell.isGrouped = cell.column.isGrouped && cell.column.id === row.groupByID
+      cell.isGrouped =
+        cell.column!.isGrouped && cell.column!.id === row.groupByID
       // Repeated cells are any columns in the groupBy that are not grouped
-      cell.isRepeatedValue = !cell.isGrouped && cell.column.isGrouped
+      cell.isRepeatedValue = !cell.isGrouped && cell.column!.isGrouped
       // Aggregated cells are not grouped, not repeated, but still have subRows
       cell.isAggregated =
         !cell.isGrouped && !cell.isRepeatedValue && row.canExpand
@@ -170,17 +182,17 @@ function useMain(instance) {
     // Find the columns that can or are aggregating
 
     // Uses each column to aggregate rows into a single value
-    const aggregateRowsToValues = (rows, isSourceRows) => {
-      const values = {}
+    const aggregateRowsToValues = (rows: Row[], isSourceRows?: boolean) => {
+      const values = {} as Record<string, any>
 
       flatColumns.forEach(column => {
         // Don't aggregate columns that are in the groupBy
-        if (groupBy.includes(column.id)) {
-          values[column.id] = rows[0] ? rows[0].values[column.id] : null
+        if (groupBy.includes(column.id!)) {
+          values[column.id!] = rows[0] ? rows[0].values![column.id!] : null
           return
         }
 
-        const columnValues = rows.map(d => d.values[column.id])
+        const columnValues = rows.map(d => d.values![column.id!])
 
         let aggregator = column.aggregate
 
@@ -201,24 +213,29 @@ function useMain(instance) {
         let aggregateFn =
           typeof aggregator === 'function'
             ? aggregator
-            : userAggregations[aggregator] || aggregations[aggregator]
+            : userAggregations[aggregator as any] ||
+              (aggregations as any)[aggregator as any]
 
         if (aggregateFn) {
-          values[column.id] = aggregateFn(columnValues, rows)
+          values[column.id!] = aggregateFn(columnValues, rows)
         } else if (aggregator) {
           console.info({ column })
           throw new Error(
             `React Table: Invalid aggregate option for column listed above`
           )
         } else {
-          values[column.id] = null
+          values[column.id!] = null
         }
       })
       return values
     }
 
     // Recursively group the data
-    const groupRecursively = (rows, depth = 0, parentPath = []) => {
+    const groupRecursively = (
+      rows: Row[],
+      depth = 0,
+      parentPath = [] as string[]
+    ) => {
       // This is the last level, just return the rows
       if (depth >= groupBy.length) {
         return rows
@@ -227,10 +244,10 @@ function useMain(instance) {
       const columnID = groupBy[depth]
 
       // Group the rows together for this level
-      let groupedRows = groupByFn(rows, columnID)
+      let _groupedRows = groupByFn(rows, columnID)
 
       // Recurse to sub rows before aggregation
-      groupedRows = Object.entries(groupedRows).map(
+      const groupedRows = Object.entries(_groupedRows).map(
         ([groupByVal, subRows], index) => {
           const path = [...parentPath, `${columnID}:${groupByVal}`]
 
@@ -276,5 +293,19 @@ function useMain(instance) {
     toggleGroupBy,
     rows: groupedRows,
     preGroupedRows: rows,
+  } as TableInstance
+}
+
+declare global {
+  namespace ReactTableGlobal {
+    export interface AllActions {
+      toggleGroupBy: any
+    }
+  }
+}
+
+declare module '../globalTypes' {
+  interface HooksList {
+    getGroupByToggleProps: Hook[]
   }
 }

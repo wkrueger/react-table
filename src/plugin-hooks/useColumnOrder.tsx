@@ -3,6 +3,7 @@ import PropTypes from 'prop-types'
 
 import { addActions, actions } from '../actions'
 import { defaultState } from '../hooks/useTable'
+import { HooksList, Column, TableInstance, TableHook } from '../globalTypes'
 
 defaultState.columnOrder = []
 
@@ -12,20 +13,18 @@ const propTypes = {
   initialRowStateAccessor: PropTypes.func,
 }
 
-export const useColumnOrder = hooks => {
-  hooks.columnsBeforeHeaderGroupsDeps.push((deps, instance) => {
+export const useColumnOrder = (hooks: HooksList) => {
+  hooks.columnsBeforeHeaderGroupsDeps.push(((deps: any, instance: any) => {
     return [...deps, instance.state.columnOrder]
-  })
+  }) as any)
   hooks.columnsBeforeHeaderGroups.push(columnsBeforeHeaderGroups)
   hooks.useMain.push(useMain)
 }
 
 useColumnOrder.pluginName = 'useColumnOrder'
 
-function columnsBeforeHeaderGroups(columns, instance) {
-  const {
-    state: { columnOrder },
-  } = instance
+function columnsBeforeHeaderGroups(columns: Column[], instance: TableInstance) {
+  const columnOrder = instance.state!.columnOrder
 
   // If there is no order, return the normal columns
   if (!columnOrder || !columnOrder.length) {
@@ -53,7 +52,7 @@ function columnsBeforeHeaderGroups(columns, instance) {
   return [...columnsInOrder, ...columnsCopy]
 }
 
-function useMain(instance) {
+const useMain: TableHook = instance => {
   PropTypes.checkPropTypes(propTypes, instance, 'property', 'useColumnOrder')
 
   const { setState } = instance
@@ -74,5 +73,13 @@ function useMain(instance) {
   return {
     ...instance,
     setColumnOrder,
+  }
+}
+
+declare global {
+  namespace ReactTableGlobal {
+    export interface AllActions {
+      setColumnOrder: any
+    }
   }
 }

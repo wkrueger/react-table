@@ -1,7 +1,17 @@
 import React from 'react'
+import {
+  Cell,
+  Column,
+  HeaderGroup,
+  HeaderComponent,
+  Row,
+  Hook,
+  TablePlugin,
+  TableInstance,
+} from './globalTypes'
 
 export const defaultColumn = {
-  Cell: ({ cell: { value = '' } }) => String(value),
+  Cell: ({ cell: { value = '' } }: { cell: Cell }) => String(value),
   show: true,
   width: 150,
   minWidth: 0,
@@ -15,7 +25,7 @@ export const safeUseLayoutEffect =
     : React.useEffect
 
 // Find the depth of the columns
-export function findMaxDepth(columns, depth = 0) {
+export function findMaxDepth(columns: Column[], depth = 0): number {
   return columns.reduce((prev, curr) => {
     if (curr.columns) {
       return Math.max(prev, findMaxDepth(curr.columns, depth + 1))
@@ -25,11 +35,11 @@ export function findMaxDepth(columns, depth = 0) {
 }
 
 export function decorateColumn(
-  column,
-  userDefaultColumn,
-  parent,
-  depth,
-  index
+  column: Column,
+  userDefaultColumn: Column,
+  parent?: Column,
+  depth?: number,
+  index?: number
 ) {
   // Apply the userDefaultColumn
   column = { ...defaultColumn, ...userDefaultColumn, ...column }
@@ -73,7 +83,12 @@ export function decorateColumn(
 }
 
 // Build the visible columns, headers and flat column list
-export function decorateColumnTree(columns, defaultColumn, parent, depth = 0) {
+export function decorateColumnTree(
+  columns: Column[],
+  defaultColumn: Column,
+  parent?: Column,
+  depth = 0
+) {
   return columns.map((column, columnIndex) => {
     column = decorateColumn(column, defaultColumn, parent, depth, columnIndex)
     if (column.columns) {
@@ -89,16 +104,16 @@ export function decorateColumnTree(columns, defaultColumn, parent, depth = 0) {
 }
 
 // Build the header groups from the bottom up
-export function makeHeaderGroups(flatColumns, defaultColumn) {
-  const headerGroups = []
+export function makeHeaderGroups(flatColumns: Column[], defaultColumn: Column) {
+  const headerGroups = [] as HeaderGroup[]
 
   // Build each header group from the bottom up
-  const buildGroup = (columns, depth) => {
+  const buildGroup = (columns: Column[], depth: number) => {
     const headerGroup = {
       headers: [],
-    }
+    } as HeaderGroup
 
-    const parentColumns = []
+    const parentColumns = [] as Column[]
 
     // Do any of these columns have parents?
     const hasParents = columns.some(col => col.parent)
@@ -111,15 +126,16 @@ export function makeHeaderGroups(flatColumns, defaultColumn) {
       let latestParentColumn = [...parentColumns].reverse()[0]
 
       // If the column has a parent, add it if necessary
-      if (column.parent) {
+      const parent = column.parent
+      if (parent) {
         const similarParentColumns = parentColumns.filter(
-          d => d.originalID === column.parent.id
+          d => d.originalID === parent.id
         )
-        if (isFirst || latestParentColumn.originalID !== column.parent.id) {
+        if (isFirst || latestParentColumn.originalID !== parent.id) {
           parentColumns.push({
             ...column.parent,
-            originalID: column.parent.id,
-            id: [column.parent.id, similarParentColumns.length].join('_'),
+            originalID: parent.id,
+            id: [parent.id, similarParentColumns.length].join('_'),
           })
         }
       } else if (hasParents) {
@@ -157,7 +173,7 @@ export function makeHeaderGroups(flatColumns, defaultColumn) {
 
       column.totalHeaderCount = column.headers
         ? column.headers.reduce(
-            (sum, header) => sum + header.totalHeaderCount,
+            (sum, header) => sum + header.totalHeaderCount!,
             0
           )
         : 1 // Leaf node columns take up at least one count
@@ -176,10 +192,10 @@ export function makeHeaderGroups(flatColumns, defaultColumn) {
   return headerGroups.reverse()
 }
 
-export function determineHeaderVisibility(instance) {
+export function determineHeaderVisibility(instance: TableInstance) {
   const { headers } = instance
 
-  const handleColumn = (column, parentVisible) => {
+  const handleColumn = (column: Column, parentVisible?: boolean) => {
     column.isVisible = parentVisible
       ? typeof column.show === 'function'
         ? column.show(instance)
@@ -204,12 +220,16 @@ export function determineHeaderVisibility(instance) {
 
   let totalVisibleHeaderCount = 0
 
-  headers.forEach(
+  headers!.forEach(
     subHeader => (totalVisibleHeaderCount += handleColumn(subHeader, true))
   )
 }
 
-export function getBy(obj, path, def) {
+export function getBy(
+  obj: Record<string, any>,
+  path: string[],
+  defaultValue?: any
+) {
   if (!path) {
     return obj
   }
@@ -220,10 +240,14 @@ export function getBy(obj, path, def) {
   } catch (e) {
     // continue regardless of error
   }
-  return typeof val !== 'undefined' ? val : def
+  return typeof val !== 'undefined' ? val : defaultValue
 }
 
-export function defaultOrderByFn(arr, funcs, dirs) {
+export function defaultOrderByFn(
+  arr: Row[],
+  funcs: ((rowA: Row, rowB: Row) => number)[],
+  dirs: (boolean | 'asc' | 'desc')[]
+) {
   return [...arr].sort((rowA, rowB) => {
     for (let i = 0; i < funcs.length; i += 1) {
       const sortFn = funcs[i]
@@ -237,7 +261,7 @@ export function defaultOrderByFn(arr, funcs, dirs) {
   })
 }
 
-export function getFirstDefined(...args) {
+export function getFirstDefined(...args: any[]) {
   for (let i = 0; i < args.length; i += 1) {
     if (typeof args[i] !== 'undefined') {
       return args[i]
@@ -245,18 +269,21 @@ export function getFirstDefined(...args) {
   }
 }
 
-export function defaultGroupByFn(rows, columnID) {
-  return rows.reduce((prev, row, i) => {
-    // TODO: Might want to implement a key serializer here so
-    // irregular column values can still be grouped if needed?
-    const resKey = `${row.values[columnID]}`
-    prev[resKey] = Array.isArray(prev[resKey]) ? prev[resKey] : []
-    prev[resKey].push(row)
-    return prev
-  }, {})
+export function defaultGroupByFn(rows: Row[], columnID: string) {
+  return rows.reduce(
+    (prev, row, i) => {
+      // TODO: Might want to implement a key serializer here so
+      // irregular column values can still be grouped if needed?
+      const resKey = `${row.values![columnID]}`
+      prev[resKey] = Array.isArray(prev[resKey]) ? prev[resKey] : []
+      prev[resKey].push(row)
+      return prev
+    },
+    {} as Record<string, Row[]>
+  )
 }
 
-export function getElementDimensions(element) {
+export function getElementDimensions(element: HTMLElement) {
   const rect = element.getBoundingClientRect()
   const style = window.getComputedStyle(element)
   const margins = {
@@ -281,11 +308,15 @@ export function getElementDimensions(element) {
   }
 }
 
-export function flexRender(Comp, props) {
-  return isReactComponent(Comp) ? <Comp {...props} /> : Comp
+export function flexRender<Props extends {}>(
+  Comp: React.ComponentType | JSX.Element,
+  props: Props
+): JSX.Element {
+  const _comp: any = Comp
+  return isReactComponent(_comp) ? <_comp {...props} /> : _comp
 }
 
-function isClassComponent(component) {
+function isClassComponent(component: any): component is React.ComponentClass {
   return (
     typeof component === 'function' &&
     !!(() => {
@@ -295,16 +326,18 @@ function isClassComponent(component) {
   )
 }
 
-function isFunctionComponent(component) {
+function isFunctionComponent(
+  component: any
+): component is React.FunctionComponent {
   return typeof component === 'function'
 }
 
-function isReactComponent(component) {
+function isReactComponent(component: any): component is React.ComponentType {
   return isClassComponent(component) || isFunctionComponent(component)
 }
 
-export const mergeProps = (...groups) => {
-  let props = {}
+export const mergeProps = (...groups: Record<string, any>[]): unknown => {
+  let props = {} as Record<string, any>
   groups.forEach(({ style = {}, className, ...rest } = {}) => {
     props = {
       ...props,
@@ -322,8 +355,8 @@ export const mergeProps = (...groups) => {
   return props
 }
 
-export const applyHooks = (hooks, initial, ...args) =>
-  hooks.reduce((prev, next) => {
+export const applyHooks = <T,>(hooks: Hook[], initial: T, ...args: any[]): T =>
+  hooks.reduce((prev, next: any) => {
     const nextValue = next(prev, ...args)
     if (typeof nextValue === 'undefined') {
       throw new Error(
@@ -333,10 +366,13 @@ export const applyHooks = (hooks, initial, ...args) =>
     return nextValue
   }, initial)
 
-export const applyPropHooks = (hooks, ...args) =>
-  hooks.reduce((prev, next) => mergeProps(prev, next(...args)), {})
+export const applyPropHooks = (hooks: Hook[], ...args: any[]) =>
+  hooks.reduce(
+    (prev, next: any) => mergeProps(prev, next(...args)) as Record<string, any>,
+    {}
+  )
 
-export const warnUnknownProps = props => {
+export const warnUnknownProps = (props: Record<string, any>) => {
   if (Object.keys(props).length) {
     throw new Error(
       `Unknown options passed to useReactTable:
@@ -346,21 +382,21 @@ ${JSON.stringify(props, null, 2)}`
   }
 }
 
-export function sum(arr) {
+export function sum(arr: number[]) {
   return arr.reduce((prev, curr) => prev + curr, 0)
 }
 
-export function isFunction(a) {
+export function isFunction<T>(a: T) {
   if (typeof a === 'function') {
     return a
   }
 }
 
-export function flattenBy(columns, childKey) {
-  const flatColumns = []
+export function flattenBy(columns: Column[], childKey: string) {
+  const flatColumns = [] as Column[]
 
-  const recurse = columns => {
-    columns.forEach(d => {
+  const recurse = (columns: Column[]) => {
+    columns.forEach((d: any) => {
       if (!d[childKey]) {
         flatColumns.push(d)
       } else {
@@ -374,7 +410,12 @@ export function flattenBy(columns, childKey) {
   return flatColumns
 }
 
-export function ensurePluginOrder(plugins, befores, pluginName, afters) {
+export function ensurePluginOrder(
+  plugins: TablePlugin[],
+  befores: string[],
+  pluginName: string,
+  afters: string[]
+) {
   const pluginIndex = plugins.findIndex(
     plugin => plugin.pluginName === pluginName
   )
@@ -409,12 +450,16 @@ This usually means you need to need to name your plugin hook by setting the 'plu
 }
 
 export function expandRows(
-  rows,
-  { manualExpandedKey, expanded, expandSubRows = true }
+  rows: Row[],
+  {
+    manualExpandedKey,
+    expanded,
+    expandSubRows = true,
+  }: { manualExpandedKey: string; expanded: string[]; expandSubRows?: boolean }
 ) {
-  const expandedRows = []
+  const expandedRows = [] as Row[]
 
-  const handleRow = row => {
+  const handleRow = (row: Row) => {
     const key = row.path.join('.')
 
     row.isExpanded =
@@ -437,7 +482,7 @@ export function expandRows(
 
 //
 
-function makePathArray(obj) {
+function makePathArray(obj: any): string[] {
   return (
     flattenDeep(obj)
       // remove all periods in parts
@@ -452,12 +497,12 @@ function makePathArray(obj) {
   )
 }
 
-function flattenDeep(arr, newArr = []) {
+function flattenDeep<T>(arr: T[], newArr = []): T[] {
   if (!Array.isArray(arr)) {
     newArr.push(arr)
   } else {
     for (let i = 0; i < arr.length; i += 1) {
-      flattenDeep(arr[i], newArr)
+      flattenDeep(arr[i] as any, newArr)
     }
   }
   return newArr

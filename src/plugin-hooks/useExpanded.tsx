@@ -4,6 +4,7 @@ import PropTypes from 'prop-types'
 import { mergeProps, applyPropHooks, expandRows } from '../utils'
 import { addActions, actions } from '../actions'
 import { defaultState } from '../hooks/useTable'
+import { HooksList, TableInstance, Hook, TableHook } from '../globalTypes'
 
 defaultState.expanded = []
 
@@ -14,14 +15,14 @@ const propTypes = {
   paginateExpandedRows: PropTypes.bool,
 }
 
-export const useExpanded = hooks => {
+export const useExpanded = (hooks: HooksList) => {
   hooks.getExpandedToggleProps = []
   hooks.useMain.push(useMain)
 }
 
 useExpanded.pluginName = 'useExpanded'
 
-function useMain(instance) {
+const useMain: TableHook = (instance: TableInstance) => {
   PropTypes.checkPropTypes(propTypes, instance, 'property', 'useExpanded')
 
   const {
@@ -35,7 +36,7 @@ function useMain(instance) {
     setState,
   } = instance
 
-  const toggleExpandedByPath = (path, set) => {
+  const toggleExpandedByPath = (path: string[], set: boolean) => {
     const key = path.join('.')
 
     return setState(old => {
@@ -59,11 +60,11 @@ function useMain(instance) {
   }
 
   hooks.prepareRow.push(row => {
-    row.toggleExpanded = set => toggleExpandedByPath(row.path, set)
+    row.toggleExpanded = (set?: boolean) => toggleExpandedByPath(row.path, set!)
     row.getExpandedToggleProps = props => {
       return mergeProps(
         {
-          onClick: e => {
+          onClick: (e: any) => {
             e.persist()
             row.toggleExpanded()
           },
@@ -107,7 +108,7 @@ function useMain(instance) {
   }
 }
 
-function findExpandedDepth(expanded) {
+function findExpandedDepth(expanded: string[]) {
   let maxDepth = 0
 
   expanded.forEach(key => {
@@ -116,4 +117,24 @@ function findExpandedDepth(expanded) {
   })
 
   return maxDepth
+}
+
+declare global {
+  namespace ReactTableGlobal {
+    export interface AllActions {
+      toggleExpanded: any
+      useExpanded: any
+    }
+  }
+}
+
+//augment existing type
+declare module '../globalTypes' {
+  interface HooksList {
+    getExpandedToggleProps: Hook[]
+  }
+  interface Row {
+    toggleExpanded(set?: boolean): TableState
+    getExpandedToggleProps(props: any): any
+  }
 }

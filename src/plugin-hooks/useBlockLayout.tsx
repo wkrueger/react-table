@@ -1,14 +1,15 @@
 import PropTypes from 'prop-types'
+import { HooksList, TableInstance } from '../globalTypes'
 
 const propTypes = {}
 
-export const useBlockLayout = hooks => {
+export const useBlockLayout = (hooks: HooksList) => {
   hooks.useMain.push(useMain)
 }
 
 useBlockLayout.pluginName = 'useBlockLayout'
 
-const useMain = instance => {
+const useMain = (instance: TableInstance) => {
   PropTypes.checkPropTypes(propTypes, instance, 'property', 'useBlockLayout')
 
   const {

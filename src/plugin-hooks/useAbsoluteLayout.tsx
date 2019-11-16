@@ -1,14 +1,15 @@
 import PropTypes from 'prop-types'
+import { HooksList, TableInstance } from '../globalTypes'
 
 const propTypes = {}
 
-export const useAbsoluteLayout = hooks => {
+export const useAbsoluteLayout = (hooks: HooksList) => {
   hooks.useMain.push(useMain)
 }
 
 useAbsoluteLayout.pluginName = 'useAbsoluteLayout'
 
-const useMain = instance => {
+const useMain = (instance: TableInstance) => {
   PropTypes.checkPropTypes(propTypes, instance, 'property', 'useAbsoluteLayout')
 
   const {

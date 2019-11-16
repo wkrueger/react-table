@@ -1,9 +1,12 @@
-const actions = {}
-const types = {}
+const actions = {} as Record<Action, string>
+const types = {} as Record<string, boolean>
 
 export { actions, types }
 
-export const addActions = (...acts) => {
+type StringOnly<T> = T extends string ? T : never
+export type Action = StringOnly<keyof ReactTableGlobal.AllActions>
+
+export const addActions = (...acts: Action[]) => {
   acts.forEach(action => {
     // Action values are formatted this way to discourage
     // you (the dev) from interacting with them in any way

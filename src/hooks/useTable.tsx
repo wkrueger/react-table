@@ -11,6 +11,23 @@ import {
   flattenBy,
   determineHeaderVisibility,
 } from '../utils'
+import {
+  Row,
+  Column,
+  TablePlugin,
+  Hook,
+  TableProps,
+  TableState,
+  TableInstance,
+  HeaderComponent,
+  HeaderPropsBase,
+  HeaderPropsMerged,
+  RowPropsMerged,
+  HeaderGroupPropsMerged,
+  Cell,
+  TablePropsBase,
+  TablePropsMerged,
+} from '../globalTypes'
 
 const propTypes = {
   // General
@@ -23,17 +40,19 @@ const propTypes = {
 }
 
 const renderErr =
-  'You must specify a valid render component. This could be "column.Cell", "column.Header", "column.Filter", "column.Aggregated" or any other custom renderer component.'
+  'You must specify a valid render component. This could be "column.Cell",' +
+  'column.Header", "column.Filter", "column.Aggregated" or any other custom' +
+  ' renderer component.'
 
-export const defaultState = {}
+export const defaultState = {} as TableState
 
-const defaultInitialState = {}
+const defaultInitialState = {} as TableState
 const defaultColumnInstance = {}
-const defaultReducer = (old, newState) => newState
-const defaultGetSubRows = (row, index) => row.subRows || []
-const defaultGetRowID = (row, index) => index
+const defaultReducer = <State,>(old: State, newState: State) => newState
+const defaultGetSubRows = (row: Row, index: number) => row.subRows || []
+const defaultGetRowID = (row: Row, index: number) => index
 
-export const useTable = (props, ...plugins) => {
+export const useTable = (props: TableProps, ...plugins: TablePlugin[]) => {
   // Validate props
   PropTypes.checkPropTypes(propTypes, props, 'property', 'useTable')
 
@@ -64,7 +83,7 @@ export const useTable = (props, ...plugins) => {
         ...originalState,
       }
       Object.keys(userState).forEach(key => {
-        newState[key] = userState[key]
+        ;(newState as any)[key] = (userState as any)[key]
       })
       return newState
     }
@@ -82,7 +101,7 @@ export const useTable = (props, ...plugins) => {
   )
 
   // The table instance ref
-  let instanceRef = React.useRef({})
+  let instanceRef = React.useRef<TableInstance>({} as any)
 
   Object.assign(instanceRef.current, {
     ...props,
@@ -168,25 +187,30 @@ export const useTable = (props, ...plugins) => {
     if (process.env.NODE_ENV === 'development' && debug)
       console.time('getAccessedRows')
 
-    let flatRows = []
+    let flatRows = [] as Row[]
 
     // Access the row's data
-    const accessRow = (originalRow, i, depth = 0, parentPath = []) => {
+    const accessRow = (
+      originalRow: Row,
+      i: number,
+      depth = 0,
+      parentPath = [] as string[]
+    ) => {
       // Keep the original reference around
       const original = originalRow
 
       const rowID = getRowID(originalRow, i)
 
       // Make the new path for the row
-      const path = [...parentPath, rowID]
+      const path = [...parentPath, rowID as string]
 
       const row = {
         original,
         index: i,
         path, // used to create a key for each row even if not nested
         depth,
-        cells: [{}], // This is a dummy cell
-      }
+        cells: [{} as any], // This is a dummy cell
+      } as Row
 
       flatRows.push(row)
 
@@ -212,9 +236,10 @@ export const useTable = (props, ...plugins) => {
       // Create the cells and values
       row.values = {}
       flatColumns.forEach(column => {
-        row.values[column.id] = column.accessor
-          ? column.accessor(originalRow, i, { subRows, depth, data })
-          : undefined
+        row.values![column.id!] =
+          column.accessor && typeof column.accessor === 'function'
+            ? column.accessor!(originalRow, i, { subRows, depth, data })
+            : undefined
       })
 
       return row
@@ -236,7 +261,7 @@ export const useTable = (props, ...plugins) => {
   // Provide a flat header list for utilities
   instanceRef.current.flatHeaders = headerGroups.reduce(
     (all, headerGroup) => [...all, ...headerGroup.headers],
-    []
+    [] as Column[]
   )
 
   if (process.env.NODE_ENV === 'development' && debug)
@@ -261,7 +286,7 @@ export const useTable = (props, ...plugins) => {
 
   // Each materialized header needs to be assigned a render function and other
   // prop getter properties here.
-  instanceRef.current.flatHeaders.forEach(column => {
+  instanceRef.current.flatHeaders!.forEach(column => {
     // Give columns/headers rendering power
     column.render = (type, userProps = {}) => {
       const Comp = typeof type === 'string' ? column[type] : type
@@ -278,7 +303,7 @@ export const useTable = (props, ...plugins) => {
     }
 
     // Give columns/headers a default getHeaderProps
-    column.getHeaderProps = props =>
+    column.getHeaderProps = (props: HeaderPropsBase) =>
       mergeProps(
         {
           key: ['header', column.id].join('_'),
@@ -290,19 +315,20 @@ export const useTable = (props, ...plugins) => {
           instanceRef.current
         ),
         props
-      )
+      ) as HeaderPropsMerged
   })
 
   instanceRef.current.headerGroups.forEach((headerGroup, i) => {
     // Filter out any headers and headerGroups that don't have visible columns
     headerGroup.headers = headerGroup.headers.filter(header => {
-      const recurse = headers =>
-        headers.filter(header => {
+      const recurse = (headers: Column[]): number => {
+        return headers.filter(header => {
           if (header.headers) {
             return recurse(header.headers)
           }
           return header.isVisible
         }).length
+      }
       if (header.headers) {
         return recurse(header.headers)
       }
@@ -322,7 +348,7 @@ export const useTable = (props, ...plugins) => {
             instanceRef.current
           ),
           props
-        )
+        ) as HeaderGroupPropsMerged
 
       return true
     }
@@ -343,8 +369,8 @@ export const useTable = (props, ...plugins) => {
   // any rows the user wishes to be displayed.
 
   instanceRef.current.prepareRow = React.useCallback(row => {
-    row.getRowProps = props =>
-      mergeProps(
+    row.getRowProps = props => {
+      return mergeProps(
         { key: ['row', ...row.path].join('_') },
         applyPropHooks(
           instanceRef.current.hooks.getRowProps,
@@ -352,7 +378,8 @@ export const useTable = (props, ...plugins) => {
           instanceRef.current
         ),
         props
-      )
+      ) as RowPropsMerged
+    }
 
     // Build the visible cells for each row
     row.cells = instanceRef.current.flatColumns
@@ -361,41 +388,37 @@ export const useTable = (props, ...plugins) => {
         const cell = {
           column,
           row,
-          value: row.values[column.id],
-        }
+          value: row.values![column.id!],
+          getCellProps: props => {
+            const columnPathStr = [...row.path, column.id].join('_')
+            return mergeProps(
+              {
+                key: ['cell', columnPathStr].join('_'),
+              },
+              applyPropHooks(
+                instanceRef.current.hooks.getCellProps,
+                cell,
+                instanceRef.current
+              ),
+              props
+            )
+          },
+          render: (type, userProps = {}) => {
+            const Comp = typeof type === 'string' ? column[type] : type
 
-        // Give each cell a getCellProps base
-        cell.getCellProps = props => {
-          const columnPathStr = [...row.path, column.id].join('_')
-          return mergeProps(
-            {
-              key: ['cell', columnPathStr].join('_'),
-            },
-            applyPropHooks(
-              instanceRef.current.hooks.getCellProps,
+            if (typeof Comp === 'undefined') {
+              throw new Error(renderErr)
+            }
+
+            return flexRender(Comp, {
+              ...instanceRef.current,
+              column,
+              row,
               cell,
-              instanceRef.current
-            ),
-            props
-          )
-        }
-
-        // Give each cell a renderer function (supports multiple renderers)
-        cell.render = (type, userProps = {}) => {
-          const Comp = typeof type === 'string' ? column[type] : type
-
-          if (typeof Comp === 'undefined') {
-            throw new Error(renderErr)
-          }
-
-          return flexRender(Comp, {
-            ...instanceRef.current,
-            column,
-            row,
-            cell,
-            ...userProps,
-          })
-        }
+              ...userProps,
+            })
+          },
+        } as Cell
 
         return cell
       })
@@ -404,34 +427,34 @@ export const useTable = (props, ...plugins) => {
     applyHooks(instanceRef.current.hooks.prepareRow, row, instanceRef.current)
   }, [])
 
-  instanceRef.current.getTableProps = userProps =>
+  instanceRef.current.getTableProps = (userProps: TablePropsBase) =>
     mergeProps(
       applyPropHooks(
         instanceRef.current.hooks.getTableProps,
         instanceRef.current
       ),
       userProps
-    )
+    ) as TablePropsMerged
 
-  instanceRef.current.getTableBodyProps = userProps =>
+  instanceRef.current.getTableBodyProps = (userProps: TablePropsBase) =>
     mergeProps(
       applyPropHooks(
         instanceRef.current.hooks.getTableBodyProps,
         instanceRef.current
       ),
       userProps
-    )
+    ) as TablePropsMerged
 
   return instanceRef.current
 }
 
-function calculateDimensions(instance) {
+function calculateDimensions(instance: TableInstance) {
   const { headers } = instance
 
   instance.totalColumnsWidth = calculateHeaderWidths(headers)
 }
 
-function calculateHeaderWidths(headers, left = 0) {
+function calculateHeaderWidths(headers: Column[], left = 0) {
   let sumTotalWidth = 0
 
   headers.forEach(header => {
@@ -443,8 +466,8 @@ function calculateHeaderWidths(headers, left = 0) {
       header.totalWidth = calculateHeaderWidths(subHeaders, left)
     } else {
       header.totalWidth = Math.min(
-        Math.max(header.minWidth, header.width),
-        header.maxWidth
+        Math.max(header.minWidth!, header.width!),
+        header.maxWidth!
       )
     }
     if (header.isVisible) {

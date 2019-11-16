@@ -1,9 +1,11 @@
+import { Row } from './globalTypes'
+
 const reSplitAlphaNumeric = /([0-9]+)/gm
 
 // Mixed sorting is slow, but very inclusive of many edge cases.
 // It handles numbers, mixed alphanumeric combinations, and even
 // null, undefined, and Infinity
-export const alphanumeric = (rowA, rowB, columnID) => {
+export const alphanumeric = (rowA: Row, rowB: Row, columnID: string) => {
   let a = getRowValueByColumnID(rowA, columnID)
   let b = getRowValueByColumnID(rowB, columnID)
   // Force to strings (or "" for unsupported types)
@@ -53,7 +55,7 @@ export const alphanumeric = (rowA, rowB, columnID) => {
   return a.length - b.length
 }
 
-export function datetime(rowA, rowB, columnID) {
+export function datetime(rowA: Row, rowB: Row, columnID: string) {
   let a = getRowValueByColumnID(rowA, columnID)
   let b = getRowValueByColumnID(rowB, columnID)
 
@@ -63,7 +65,7 @@ export function datetime(rowA, rowB, columnID) {
   return compareBasic(a, b)
 }
 
-export function basic(rowA, rowB, columnID) {
+export function basic(rowA: Row, rowB: Row, columnID: string) {
   let a = getRowValueByColumnID(rowA, columnID)
   let b = getRowValueByColumnID(rowB, columnID)
 
@@ -72,15 +74,15 @@ export function basic(rowA, rowB, columnID) {
 
 // Utils
 
-function compareBasic(a, b) {
+function compareBasic(a: any, b: any) {
   return a === b ? 0 : a > b ? 1 : -1
 }
 
-function getRowValueByColumnID(row, columnID) {
-  return row.values[columnID]
+function getRowValueByColumnID(row: Row, columnID: string) {
+  return row.values![columnID]
 }
 
-function toString(a) {
+function toString(a: any) {
   if (typeof a === 'number') {
     if (isNaN(a) || a === Infinity || a === -Infinity) {
       return ''

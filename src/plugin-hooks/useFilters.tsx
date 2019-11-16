@@ -5,6 +5,7 @@ import { getFirstDefined, isFunction } from '../utils'
 import * as filterTypes from '../filterTypes'
 import { addActions, actions } from '../actions'
 import { defaultState } from '../hooks/useTable'
+import { HooksList, TableHook, Row } from '../globalTypes'
 
 defaultState.filters = {}
 
@@ -21,13 +22,13 @@ const propTypes = {
   manualFilters: PropTypes.bool,
 }
 
-export const useFilters = hooks => {
+export const useFilters = (hooks: HooksList) => {
   hooks.useMain.push(useMain)
 }
 
 useFilters.pluginName = 'useFilters'
 
-function useMain(instance) {
+const useMain: TableHook = instance => {
   PropTypes.checkPropTypes(propTypes, instance, 'property', 'useFilters')
 
   const {
@@ -45,7 +46,12 @@ function useMain(instance) {
   const preFilteredRows = rows
   const preFilteredFlatRows = flatRows
 
-  const setFilter = (id, updater) => {
+  interface UpdaterFn {
+    (i: any): Record<string, any>
+    [k: string]: string
+  }
+
+  const setFilter = (id: string, updater: UpdaterFn) => {
     const column = flatColumns.find(d => d.id === id)
 
     if (!column) {
@@ -81,7 +87,7 @@ function useMain(instance) {
     }, actions.setFilter)
   }
 
-  const setAllFilters = updater => {
+  const setAllFilters = (updater: UpdaterFn) => {
     return setState(old => {
       const newFilters = typeof updater === 'function' ? updater(old) : updater
 
@@ -89,6 +95,7 @@ function useMain(instance) {
       Object.keys(newFilters).forEach(id => {
         const newFilter = newFilters[id]
         const column = flatColumns.find(d => d.id === id)
+        if (!column) return
         const filterMethod = getFilterMethod(
           column.filter,
           userFilterTypes || {},
@@ -114,17 +121,17 @@ function useMain(instance) {
     column.canFilter = accessor
       ? getFirstDefined(
           columnDisableFilters === true ? false : undefined,
-          disableFilters === true ? false : undefined,
+          (disableFilters as any) === true ? false : undefined,
           true
         )
       : false
 
     // Provide the column a way of updating the filter value
-    column.setFilter = val => setFilter(column.id, val)
+    column.setFilter = (val: any) => setFilter(column.id!, val)
 
     // Provide the current filter value to the column for
     // convenience
-    column.filterValue = filters[id]
+    column.filterValue = filters[id!]
   })
 
   // TODO: Create a filter cache for incremental high speed multi-filtering
@@ -140,13 +147,13 @@ function useMain(instance) {
       }
     }
 
-    const filteredFlatRows = []
+    const filteredFlatRows = [] as Row[]
 
     if (process.env.NODE_ENV === 'development' && debug)
       console.info('getFilteredRows')
 
     // Filters top level and nested rows
-    const filterRows = (rows, depth = 0) => {
+    const filterRows = (rows: Row[], depth = 0) => {
       let filteredRows = rows
 
       filteredRows = Object.entries(filters).reduce(
@@ -228,7 +235,7 @@ function useMain(instance) {
     // Now that each filtered column has it's partially filtered rows,
     // lets assign the final filtered rows to all of the other columns
     const nonFilteredColumns = flatColumns.filter(
-      column => !Object.keys(filters).includes(column.id)
+      column => !Object.keys(filters).includes(column.id!)
     )
 
     // This essentially enables faceted filter options to be built easily
@@ -250,15 +257,28 @@ function useMain(instance) {
   }
 }
 
-function shouldAutoRemove(autoRemove, value) {
+function shouldAutoRemove(autoRemove: (v: any) => boolean, value: any) {
   return autoRemove ? autoRemove(value) : typeof value === 'undefined'
 }
 
-function getFilterMethod(filter, userFilterTypes, filterTypes) {
+function getFilterMethod(
+  filter: ((val: any) => boolean) | string,
+  userFilterTypes: Record<string, any>,
+  filterTypes: Record<string, any>
+) {
   return (
     isFunction(filter) ||
-    userFilterTypes[filter] ||
-    filterTypes[filter] ||
+    userFilterTypes[filter as string] ||
+    filterTypes[filter as string] ||
     filterTypes.text
   )
+}
+
+declare global {
+  namespace ReactTableGlobal {
+    export interface AllActions {
+      setFilter: any
+      setAllFilters: any
+    }
+  }
 }
