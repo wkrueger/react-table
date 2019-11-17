@@ -248,7 +248,7 @@ const useMain: TableHook = instance => {
 
       // Recurse to sub rows before aggregation
       const groupedRows = Object.entries(_groupedRows).map(
-        ([groupByVal, subRows], index) => {
+        ([groupByVal, subRows]: [any, any], index) => {
           const path = [...parentPath, `${columnID}:${groupByVal}`]
 
           subRows = groupRecursively(subRows, depth + 1, path)

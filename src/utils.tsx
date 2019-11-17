@@ -10,7 +10,7 @@ import {
   TableInstance,
 } from './globalTypes'
 
-export const defaultColumn = {
+export const defaultColumn: Partial<Column> = {
   Cell: ({ cell: { value = '' } }: { cell: Cell }) => String(value),
   show: true,
   width: 150,

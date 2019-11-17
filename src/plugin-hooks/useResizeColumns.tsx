@@ -5,6 +5,7 @@ import PropTypes from 'prop-types'
 import { defaultState } from '../hooks/useTable'
 import { defaultColumn, getFirstDefined } from '../utils'
 import { mergeProps, applyPropHooks } from '../utils'
+import { HooksList, TableHook, Row, Column } from '../globalTypes'
 
 defaultState.columnResizing = {
   columnWidths: {},
@@ -14,13 +15,13 @@ defaultColumn.canResize = true
 
 const propTypes = {}
 
-export const useResizeColumns = hooks => {
+export const useResizeColumns = (hooks: HooksList) => {
   hooks.useBeforeDimensions.push(useBeforeDimensions)
 }
 
 useResizeColumns.pluginName = 'useResizeColumns'
 
-const useBeforeDimensions = instance => {
+const useBeforeDimensions: TableHook = instance => {
   PropTypes.checkPropTypes(propTypes, instance, 'property', 'useResizeColumns')
 
   instance.hooks.getResizerProps = []
@@ -41,20 +42,20 @@ const useBeforeDimensions = instance => {
     }
   })
 
-  const onMouseDown = (e, header) => {
+  const onMouseDown = (e: any, header: Column) => {
     const headersToResize = getLeafHeaders(header)
-    const startWidths = headersToResize.map(header => header.totalWidth)
+    const startWidths = headersToResize.map(header => header.totalWidth!)
     const startX = e.clientX
 
-    const onMouseMove = e => {
+    const onMouseMove = (e: any) => {
       const currentX = e.clientX
       const deltaX = currentX - startX
 
       const percentageDeltaX = deltaX / headersToResize.length
 
-      const newColumnWidths = {}
+      const newColumnWidths = {} as Record<string, any>
       headersToResize.forEach((header, index) => {
-        newColumnWidths[header.id] = Math.max(
+        newColumnWidths[header.id!] = Math.max(
           startWidths[index] + percentageDeltaX,
           0
         )
@@ -72,7 +73,7 @@ const useBeforeDimensions = instance => {
       }))
     }
 
-    const onMouseUp = e => {
+    const onMouseUp = (e: any) => {
       document.removeEventListener('mousemove', onMouseMove)
       document.removeEventListener('mouseup', onMouseUp)
 
@@ -94,7 +95,7 @@ const useBeforeDimensions = instance => {
       columnResizing: {
         ...old.columnResizing,
         startX,
-        isResizingColumn: header.id,
+        isResizingColumn: header.id!,
       },
     }))
   }
@@ -107,14 +108,14 @@ const useBeforeDimensions = instance => {
     )
 
     header.canResize = canResize
-    header.width = columnResizing.columnWidths[header.id] || header.width
+    header.width = columnResizing.columnWidths[header.id!] || header.width
     header.isResizing = columnResizing.isResizingColumn === header.id
 
     if (canResize) {
       header.getResizerProps = userProps => {
         return mergeProps(
           {
-            onMouseDown: e => e.persist() || onMouseDown(e, header),
+            onMouseDown: (e: any) => e.persist() || onMouseDown(e, header),
             style: {
               cursor: 'ew-resize',
             },
@@ -122,7 +123,7 @@ const useBeforeDimensions = instance => {
           },
           applyPropHooks(instance.hooks.getResizerProps, header, instance),
           userProps
-        )
+        ) as any
       }
     }
   })
@@ -130,9 +131,9 @@ const useBeforeDimensions = instance => {
   return instance
 }
 
-function getLeafHeaders(header) {
-  const leafHeaders = []
-  const recurseHeader = header => {
+function getLeafHeaders(header: Column) {
+  const leafHeaders = [] as Column[]
+  const recurseHeader = (header: Column) => {
     if (header.columns && header.columns.length) {
       header.columns.map(recurseHeader)
     }
@@ -140,4 +141,10 @@ function getLeafHeaders(header) {
   }
   recurseHeader(header)
   return leafHeaders
+}
+
+declare module '../globalTypes' {
+  interface HooksList {
+    getResizerProps: Hook[]
+  }
 }

@@ -69,9 +69,13 @@ export interface Column {
   canGroupBy?: boolean
   toggleGroupBy: () => TableState
   Aggregated?: Cell
-  Cell: Cell
+  Cell: (i: { cell: Cell }) => string
   getGroupByToggleProps(props: any): any
   aggregate: ((values: any, rows: Row[]) => any) | [any, any]
+  canResize: boolean
+  disableResizing: boolean
+  isResizing?: boolean
+  getResizerProps: (i: Record<string, any>) => Record<string, any>
 }
 
 export type ColumnShowFunction = (c: TableInstance) => boolean
@@ -93,6 +97,13 @@ export interface TableState {
   expanded: string[]
   filters: Record<string, any>
   groupBy: string[]
+  pageSize: number
+  pageIndex: number
+  sortBy: {}[]
+  columnResizing: {
+    columnWidths: Record<string, number>
+    isResizingColumn?: string | null
+  }
 }
 
 export interface TableProps {
@@ -125,12 +136,12 @@ export interface HooksList {
   getTableBodyProps: Hook[]
   getRowProps: Hook[]
   getHeaderGroupProps: Hook[]
-  getHeaderProps: Hook[]
+  getHeaderProps: (() => Record<string, any>)[]
   getCellProps: Hook[]
 }
 
 export interface TableInstance extends TableProps {
-  setState: (fn: (s: TableState) => TableState, action: string) => TableState
+  setState: (fn: (s: TableState) => TableState, action?: string) => TableState
   plugins: TablePlugin[]
   hooks: HooksList
 
@@ -156,6 +167,12 @@ export interface TableInstance extends TableProps {
   manualGroupBy?: boolean
   disableGrouping?: boolean
   aggregations?: Record<string, any>
+
+  manualPagination?: boolean
+  disablePageResetOnDataChange?: boolean
+  pageCount: number
+
+  disableResizing?: boolean
 }
 
 export interface HeaderPropsBase {}

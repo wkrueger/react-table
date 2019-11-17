@@ -5,6 +5,7 @@ import PropTypes from 'prop-types'
 import { addActions, actions } from '../actions'
 import { defaultState } from '../hooks/useTable'
 import { ensurePluginOrder, safeUseLayoutEffect, expandRows } from '../utils'
+import { TableHook, HooksList } from '../globalTypes'
 
 defaultState.pageSize = 10
 defaultState.pageIndex = 0
@@ -17,13 +18,13 @@ const propTypes = {
   paginateExpandedRows: PropTypes.bool,
 }
 
-export const usePagination = hooks => {
+export const usePagination = (hooks: HooksList) => {
   hooks.useMain.push(useMain)
 }
 
 usePagination.pluginName = 'usePagination'
 
-function useMain(instance) {
+const useMain: TableHook = instance => {
   PropTypes.checkPropTypes(propTypes, instance, 'property', 'usePagination')
 
   const {
@@ -50,10 +51,10 @@ function useMain(instance) {
 
   const rowDep = manualPagination ? null : data
 
-  const isPageIndexMountedRef = React.useRef()
+  const isPageIndexMountedRef = React.useRef<boolean>()
 
   // Bypass any effects from firing when this changes
-  const disablePageResetOnDataChangeRef = React.useRef()
+  const disablePageResetOnDataChangeRef = React.useRef<boolean>()
   disablePageResetOnDataChangeRef.current = disablePageResetOnDataChange
 
   safeUseLayoutEffect(() => {
@@ -117,7 +118,7 @@ function useMain(instance) {
   const canNextPage = pageCount === -1 || pageIndex < pageCount - 1
 
   const gotoPage = React.useCallback(
-    updater => {
+    (updater: ((page: number) => number) | number) => {
       if (process.env.NODE_ENV === 'development' && debug)
         console.info('gotoPage')
       return setState(old => {
@@ -172,5 +173,14 @@ function useMain(instance) {
     setPageSize,
     pageIndex,
     pageSize,
+  }
+}
+
+declare global {
+  namespace ReactTableGlobal {
+    export interface AllActions {
+      pageChange: any
+      pageSizeChange: any
+    }
   }
 }
